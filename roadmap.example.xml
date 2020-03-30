@@ -1,0 +1,8 @@
+<RoadMap>
+    <Node layer="0">
+        <Hostname>skyline</Hostname>
+        <User>imgrass</User>
+        <Password>rootroot</Password>
+        <IdentityFile>~/.ssh/id_rsa</IdentityFile>
+    </Node>
+</RoadMap>
