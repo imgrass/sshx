@@ -54,6 +54,7 @@
 
 
 void printf_ipaddr(struct sockaddr_storage *ipaddr);
-struct sockaddr_storage *get_host_from_name(char *hostname);
+struct sockaddr_storage *get_host_from_name(char *hostname,
+        unsigned short port);
 
 #endif

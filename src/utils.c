@@ -19,7 +19,8 @@ void printf_ipaddr(struct sockaddr_storage *ipaddr) {
 }
 
 
-struct sockaddr_storage *get_host_from_name(char *hostname) {
+struct sockaddr_storage *get_host_from_name(char *hostname,
+        unsigned short port) {
     struct addrinfo hints = {0}, *res = NULL, *first_res = NULL;
     int errcode = 0;
 
@@ -54,5 +55,11 @@ struct sockaddr_storage *get_host_from_name(char *hostname) {
     }
 #else
 #endif
+    // Add port here.
+    if (first_res->ai_family == AF_INET) {
+        ((struct sockaddr_in *)(first_res->ai_addr))->sin_port = htons(port);
+    } else if (first_res->ai_family == AF_INET6) {
+        ((struct sockaddr_in6 *)(first_res->ai_addr))->sin6_port = htons(port);
+    }
     return (struct sockaddr_storage *)(first_res->ai_addr);
 }
