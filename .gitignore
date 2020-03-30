@@ -1,0 +1,6 @@
+# the tmp files produced by gcc compliling.
+build/
+*.o
+
+# the link file
+lnk_*

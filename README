@@ -1,0 +1,16 @@
+*Description:
+
+   +---------+         +---------+          +---------+
+   | host    | ----->  | host    | ---> ... | host    |
+   |  A1     | <-----  |  A2     | ... <--- |  An     |
+   +---------+         +---------+          +---------+
+
+This want to implement data transmission between two terminal hosts across
+multiple hosts, where the connection method could be SSH, TCP, UDP, etc.
+
+*Build
+Use cmake to build, you can ref to these steps shown below:
+    $ cd /path/to/src_dir
+    $ mkdir build && cd build
+    $ cmake ..
+    $ cmake --build .
