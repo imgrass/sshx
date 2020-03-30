@@ -90,6 +90,7 @@ set(DIR_LIB_FOUND_AUTOMATICALLY
 link_directories(${DIR_LIB_FOUND_AUTOMATICALLY})
 find_library(LIB_SSH2 libssh2.a ${DIR_LIB_FOUND_AUTOMATICALLY})
 find_library(LIB_XMLC libxml.a ${DIR_LIB_FOUND_AUTOMATICALLY})
+find_library(LIB_CRYPTO crypto ${DIR_LIB_FOUND_AUTOMATICALLY})
 
 #------------------------------------------------------------------------------
 # specify the file location exactly to avoid the confusion with other files of
@@ -98,9 +99,14 @@ find_library(LIB_XMLC libxml.a ${DIR_LIB_FOUND_AUTOMATICALLY})
 ## link_libraries(${CMAKE_SOURCE_DIR}/lib/libxml2/lib/${LIB_XML2})
 
 # print the libraries here.
+#!!! NOTE:
+#       The <LIB_SSH2> must be placed in front of the <LIB_CRYPTO> because
+#   <LIB_SSH2> is a static link library and <LIB_CRYPTO> is a dependent
+#   library of it.
 set(LIB_NEED_TO_LINKED
-    ${LIB_XMLC}
     ${LIB_SSH2}
+    ${LIB_CRYPTO}
+    ${LIB_XMLC}
 )
 printf_linked_lib(LIB_NEED_TO_LINKED)
 
