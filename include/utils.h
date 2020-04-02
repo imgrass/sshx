@@ -52,6 +52,14 @@
     snprintf((str), size, "%d%c", (num), 0); \
 } while(0);
 
+struct variable_len_buff {
+    int8_t *buff;
+    size_t size;
+};
+
+inline void free_buf_in_variable_len_buff (struct variable_len_buff *v_buff) {
+    free(v_buff->buff);
+}
 
 void printf_ipaddr(struct sockaddr_storage *ipaddr);
 struct sockaddr_storage *get_host_from_name(char *hostname,
