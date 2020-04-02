@@ -56,7 +56,7 @@ set(SRC_FILES)
 # perform the same operation on the source code in different directories
 set(DIR_SRC src)
 set(SRC_FILES_BASE
-    main.c parse_roadmap.c ssh_sftp.c ssh_tunnel.c utils.c
+    main.c parse_roadmap.c ssh_sftp.c ssh_tunnel.c utils.c sshx_string.c
 )
 add_dir_for_src_lst(SRC_FILES DIR_SRC SRC_FILES_BASE)
 # ...

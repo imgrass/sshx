@@ -1,84 +1,6 @@
 #include <ssh_sftp.h>
 
 
-void free_buf_in_rmt_exec_rslt(struct rmt_exec_rslt *result) {
-    struct buf_unit *ptr = NULL;
-    while ((ptr=result->head)!=NULL) {
-        result->head = ptr->next;
-        free(ptr->buf);
-        free(ptr);
-    }
-}
-
-
-void copy_char_to_rmt_exec_rslt(char word, struct rmt_exec_rslt *result) {
-    int n = result->num_buf_unit, u = result->unit_len_of_sigle_buf,
-        t = result->total_len;
-    int rest = t - (n * (n - 1) / 2) * u;
-    struct buf_unit *ptr = NULL;
-
-    if (rest<n*u) {
-        result->tail->buf[rest] = word;
-    } else if (rest==0 || rest==n*u) {
-        ptr = (struct buf_unit *)calloc(1, sizeof(struct buf_unit));
-        ptr->buf = (char *)calloc(1, (n+1)*u);
-        ptr->buf[0] = word;
-        ptr->next = NULL;
-
-        // Insert first word to buff, it need to specify 'head'
-        if (rest==0) {
-            result->head = ptr;
-            result->tail = ptr;
-        } else {
-            result->tail->next = ptr;
-            result->tail = ptr;
-        }
-        result->num_buf_unit++;
-    }
-    result->total_len++;
-}
-
-
-void copy_from_rmt_exec_rslt_to_one_buff(struct rmt_exec_rslt *result,
-        struct variable_len_buff *buff) {
-    struct buf_unit *ptr_buf_unit = NULL;
-    int8_t *ptr_buff = NULL;
-    size_t i = 0, offset = 0, rest = 0;
-
-    if (result->total_len == 0) {
-        DEBUG("The buff of rmt_exec_rslt is NULL");
-        return;
-    }
-    buff->size = result->total_len;
-    rest = buff->size;
-    buff->buff = (int8_t *)calloc(1, buff->size);
-    ptr_buff = buff->buff;
-
-    i = 0;
-    ptr_buf_unit = result->head;
-    while (1) {
-        if (ptr_buf_unit == NULL) {
-            break;
-        }
-        i++;
-
-        if (i < result->num_buf_unit) {
-            offset = i * result->unit_len_of_sigle_buf;
-            memcpy(ptr_buff, ptr_buf_unit->buf, offset);
-            ptr_buff = ptr_buff + offset;
-            rest -= offset;
-        } else if (i == result->num_buf_unit) {
-            memcpy(ptr_buff, ptr_buf_unit->buf, rest);
-        } else {
-            ERROR("The format of rmt_exec_rslt is error!!! Pls check it");
-            exit(1);
-        }
-
-        ptr_buf_unit = ptr_buf_unit->next;
-    }
-}
-
-
 static int get_socket_fd(struct sockaddr_storage *ipaddr) {
     int fd = -1;
 
@@ -216,8 +138,7 @@ static int wait_socket(int socket_fd, LIBSSH2_SESSION *session) {
 
 
 static void read_output_from_channel(LIBSSH2_SESSION *session,
-        LIBSSH2_CHANNEL *channel, int socket_fd,
-        struct rmt_exec_rslt *result) {
+        LIBSSH2_CHANNEL *channel, int socket_fd, struct ukl_buff *result) {
     int i = 0, rc = 0;
     size_t buff_size = 0x4000;
     char buff[buff_size];
@@ -225,14 +146,14 @@ static void read_output_from_channel(LIBSSH2_SESSION *session,
         rc = 0;
         do {
             bzero(buff, buff_size);
-            rc = libssh2_channel_read(channel, buff, sizeof(buff));
+            rc = libssh2_channel_read(channel, buff, buff_size);
             if (rc > 0) {
                 for (i=0; i<rc; i++) {
-                    copy_char_to_rmt_exec_rslt(buff[i], result);
+                    add_word_to_ukl_buff(buff[i], result);
                 }
             } else {
                 if (rc != LIBSSH2_ERROR_EAGAIN) {
-                    //DEBUG("Libssh2_channel_read returned %d", rc);
+                    // DEBUG("Libssh2_channel_read returned %d", rc);
                     ;;
                 }
             }
@@ -253,8 +174,8 @@ int get_ssh_remote_exec(LIBSSH2_SESSION *session, int fd, char *cmdline,
     int rc = 0;
     char *exitsignal = (char *)"none";
     LIBSSH2_CHANNEL *channel = NULL;
-    struct rmt_exec_rslt result = {0};
-    init_rmt_exec_rslt(&result);
+    struct ukl_buff result = {0};
+    init_ukl_buff(&result, 0);
 
     INFO("Exec cmd: <%s>", cmdline);
     // exec Non-Blocking on the remote host
@@ -285,8 +206,8 @@ int get_ssh_remote_exec(LIBSSH2_SESSION *session, int fd, char *cmdline,
 
     // * get result after the command was run in peer host
     read_output_from_channel(session, channel, fd, &result);
-    copy_from_rmt_exec_rslt_to_one_buff(&result, &status_output->v_buff);
-    free_buf_in_rmt_exec_rslt(&result);
+    copy_from_ukl_buff_to_vl_buff(&result, &status_output->vl);
+    free_mem_of_ukl_buff(&result);
     DEBUG("Get output successfully!");
 
     // * get exitcode
@@ -303,7 +224,7 @@ int get_ssh_remote_exec(LIBSSH2_SESSION *session, int fd, char *cmdline,
         INFO("Got signal from peer: %s", exitsignal);
     } else {
         INFO("EXIT: %d; Totally get %lu bytes", status_output->status_code,
-                status_output->v_buff.size);
+                status_output->vl.size);
     }
     return 0;
 }

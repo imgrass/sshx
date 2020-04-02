@@ -6,32 +6,30 @@
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 
-#define INFO(...) do { \
-    fprintf(stdout, "+[INFO][Line: %u] ", __LINE__); \
-    fprintf(stdout, __VA_ARGS__); \
-    fprintf(stdout, "\n"); \
+#define LOG_BASE(type, fd, ...) do { \
+    size_t len = strlen(__FILE__); \
+    char *file_name = __FILE__, *ptr = NULL; \
+    for (ptr=file_name+len; *ptr!='/' && ptr>=file_name; ptr--); \
+    fprintf((fd), "+[%s][%s::%s][Line: %u] ", (type),  ptr+1,  __func__, \
+            __LINE__); \
+    fprintf((fd), __VA_ARGS__); \
+    fprintf((fd), "\n"); \
 } while(0);
 
-#define ERROR(...) do { \
-    fprintf(stderr, "-[ERROR][Line: %u] ", __LINE__); \
-    fprintf(stderr, __VA_ARGS__); \
-    fprintf(stderr, "\n"); \
-} while(0);
+#define INFO(...) LOG_BASE("INFO", stdout, __VA_ARGS__)
+
+#define ERROR(...) LOG_BASE("ERROR", stderr, __VA_ARGS__)
 
 #ifdef IMGRASS_DEBUG
-#define DEBUG(...) do { \
-    fprintf(stdout, "-[DEBUG][Line: %u] ", __LINE__); \
-    fprintf(stdout, __VA_ARGS__); \
-    fprintf(stdout, "\n"); \
-} while(0);
-
+#define DEBUG(...) LOG_BASE("DEBUG", stdout, __VA_ARGS__)
 #else
 #define DEBUG(...)
 #endif
 
-#define PRINTF_STDOUT_BEAUTIFULLY(index, ...) do {\
+#define PRINTF_STDOUT_BEAUTIFULLY(index, ...) do { \
     int i = 0; \
     fprintf(stdout, "*"); \
     while (i++<index) { \
@@ -39,6 +37,15 @@
     } \
     fprintf(stdout, __VA_ARGS__); \
     fprintf(stdout, "\n"); \
+} while(0);
+
+#define PRINTF_STDOUT_BUFF(buf, size) do { \
+    size_t i; \
+    fprintf(stdout, "<"); \
+    for (i=0; i<(size); i++) { \
+        fprintf(stdout, "%c", (char)(buf)[i]); \
+    } \
+    fprintf(stdout, ">\n"); \
 } while(0);
 
 /**
@@ -52,17 +59,8 @@
     snprintf((str), size, "%d%c", (num), 0); \
 } while(0);
 
-struct variable_len_buff {
-    int8_t *buff;
-    size_t size;
-};
-
-inline void free_buf_in_variable_len_buff (struct variable_len_buff *v_buff) {
-    free(v_buff->buff);
-}
 
 void printf_ipaddr(struct sockaddr_storage *ipaddr);
 struct sockaddr_storage *get_host_from_name(char *hostname,
         unsigned short port);
-
 #endif
