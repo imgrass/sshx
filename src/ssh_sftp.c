@@ -39,6 +39,7 @@ static void printf_fingerprint(const char *fingerprint) {
     return;
 }
 
+
 static int authenticate_ssh_session(LIBSSH2_SESSION *session, char *user,
         char *password, char *identityfile) {
     int rc = 0;
@@ -142,15 +143,22 @@ static void read_output_from_channel(LIBSSH2_SESSION *session,
     int i = 0, rc = 0;
     size_t buff_size = 0x4000;
     char buff[buff_size];
+    time_t start, end;
+    long double timeout = 10;
+
+    time(&start);
     while (1) {
         rc = 0;
+        RETURN_WHEN_TIME_OUT(start, end, timeout);
         do {
+            RETURN_WHEN_TIME_OUT(start, end, timeout);
             bzero(buff, buff_size);
             rc = libssh2_channel_read(channel, buff, buff_size);
             if (rc > 0) {
                 for (i=0; i<rc; i++) {
                     add_word_to_ukl_buff(buff[i], result);
                 }
+                printf("<total len:%lu\n", result->total_len);
             } else {
                 if (rc != LIBSSH2_ERROR_EAGAIN) {
                     // DEBUG("Libssh2_channel_read returned %d", rc);

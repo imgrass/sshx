@@ -7,11 +7,23 @@
 #include <sshx_string.h>
 #include <string.h>
 #include <sys/time.h>
+#include <time.h>
+
+
+// avoid being unable to quit.
+#define RETURN_WHEN_TIME_OUT(start, end, timeout) do { \
+        time(&(end)); \
+        if (difftime((end), (start)) > (timeout)) { \
+            INFO("Read output from channel TIME_OUT %Lfs", (timeout)); \
+            return; \
+        } \
+} while(0);
 
 struct rmt_exec_status_output {
     struct vl_buff vl;
     int status_code;
 };
+
 
 LIBSSH2_SESSION *create_ssh_authed_session(int *fd,
         struct roadmap_next_node *nxt_nd);
