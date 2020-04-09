@@ -51,4 +51,5 @@ struct node {
 
 int parse_roadmap(FILE *source, struct node **node, int layer);
 void print_roadmap_node_info(struct node *node);
+void free_mem_in_node(struct node *node);
 #endif

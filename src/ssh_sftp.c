@@ -131,8 +131,12 @@ static int wait_socket(int socket_fd, LIBSSH2_SESSION *session) {
     // make sure it wait in the correct direction
     direction = libssh2_session_block_directions(session);
     if (direction & LIBSSH2_SESSION_BLOCK_INBOUND) {
+        readfd = &fd;
+    }
+    if (direction & LIBSSH2_SESSION_BLOCK_OUTBOUND) {
         writefd = &fd;
     }
+
     rc = select(socket_fd+1, readfd, writefd, NULL, &timeout);
     return rc;
 }
@@ -234,5 +238,119 @@ int get_ssh_remote_exec(LIBSSH2_SESSION *session, int fd, char *cmdline,
         INFO("EXIT: %d; Totally get %lu bytes", status_output->status_code,
                 status_output->vl.size);
     }
+    return 0;
+}
+
+
+static int sync_buff_from_channel_to_local_file(LIBSSH2_SESSION *session,
+        LIBSSH2_CHANNEL *channel, int socket_fd, int fd_w,
+        libssh2_struct_stat *fileinfo) {
+    libssh2_struct_stat_size got = 0;
+    libssh2_struct_stat_size total = 0;
+    int rc = 0, spin = 0, buffsize = 1024 * 24; // 24k
+    char buff[buffsize];
+    bzero(buff, buffsize);
+
+    while (got<fileinfo->st_size) {
+        while (1) {
+            if ((fileinfo->st_size-got)<buffsize) {
+                buffsize = (int)(fileinfo->st_size - got);
+            }
+            DEBUG("--<got:%ld>", (long)got);
+            rc = libssh2_channel_read(channel, buff, buffsize);
+            DEBUG("---<rc:%d> <buffsize:%d", rc, buffsize);
+            if (rc<=0) {
+                break;
+            }
+            if (write(fd_w, buff, rc)!=rc) {
+                ERROR("Write to local path failed due to %s", strerror(errno));
+                return -1;
+            }
+            got += rc;
+            total += rc;
+        }
+
+        if ((rc==LIBSSH2_ERROR_EAGAIN) && (got<fileinfo->st_size)) {
+            spin++;
+            DEBUG("Read buff from channel occurred some error in %dth, "
+                  "got %ld bytes in total size %ld now, continue...",
+                  spin, (long)got, (long)fileinfo->st_size);
+            wait_socket(socket_fd, session);
+            continue;
+        }
+        break;
+    }
+    return 0;
+}
+
+
+static LIBSSH2_CHANNEL *create_scp_recv_channel(LIBSSH2_SESSION *session,
+        int socket_fd, char *remote_path, libssh2_struct_stat *fileinfo) {
+    char *msg = NULL;
+    LIBSSH2_CHANNEL *channel = NULL;
+    do {
+        channel = libssh2_scp_recv2(session, remote_path, fileinfo);
+        if (channel==NULL) {
+            if (libssh2_session_last_errno(session)!=LIBSSH2_ERROR_EAGAIN) {
+                libssh2_session_last_error(session, &msg, NULL, 0);
+                ERROR("Download failed due to %s", msg);
+                return NULL;
+            } else {
+                DEBUG("Download ... libssh2_scp_recv() spin");
+                wait_socket(socket_fd, session);
+            }
+        }
+    } while(channel==NULL);
+    DEBUG("libssh2_scp_recv() is done, now receive data with <channel:%p>",
+            channel);
+    return channel;
+}
+
+
+int scp_download_one_non_blocking(LIBSSH2_SESSION *session, int socket_fd,
+        char *remote_path, char *local_path) {
+    LIBSSH2_CHANNEL *channel = NULL;
+    libssh2_struct_stat fileinfo = {0};
+    int api_block_mode = libssh2_session_get_blocking(session);
+    int fd_w = 0;
+    int rc = 0;
+
+    // set session non-blocking
+    libssh2_session_set_blocking(session, 0);
+
+    // get channel with remote host
+    channel = create_scp_recv_channel(session, socket_fd, remote_path,
+            &fileinfo);
+    if (channel==NULL) {
+        libssh2_session_set_blocking(session, api_block_mode);
+        return -1;
+    }
+
+    // open write fd of local path
+    fd_w = open(local_path, O_WRONLY|O_CREAT|O_TRUNC, fileinfo.st_mode);
+    if (fd_w==-1) {
+        ERROR("Can not open write fd for <local_path:%s> due to %s",
+                local_path, strerror(errno));
+        libssh2_channel_free(channel);
+        libssh2_session_set_blocking(session, api_block_mode);
+        return -1;
+    }
+    DEBUG("Open write fd for <local_path:%s> successfully!", local_path);
+
+    // read from channel to buff, and then write it to local path
+    rc = sync_buff_from_channel_to_local_file(session, channel, socket_fd,
+            fd_w, &fileinfo);
+    if (rc!=0) {
+        libssh2_session_set_blocking(session, api_block_mode);
+        return -1;
+    }
+
+    libssh2_session_set_blocking(session, api_block_mode);
+    return 0;
+}
+
+
+int scp_upload_one(LIBSSH2_SESSION *session, int fd, char *local_path,
+        char *remote_path) {
     return 0;
 }

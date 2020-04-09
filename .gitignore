@@ -4,3 +4,7 @@ build/
 
 # the link file
 lnk_*
+
+# tag file
+tags
+*.tag

@@ -115,3 +115,12 @@ void print_roadmap_node_info(struct node *node) {
     PRINTF_STDOUT_BEAUTIFULLY(2, "identityfile -> <%s>",
             node->peer_load_info.identityfile);
 }
+
+
+void free_mem_in_node(struct node *node) {
+    struct roadmap_next_node *nd = &node->peer_load_info;
+    free(nd->hostname);
+    free(nd->user);
+    free(nd->password);
+    free(nd->identityfile);
+}
