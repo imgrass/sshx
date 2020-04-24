@@ -59,25 +59,26 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    /*
     // ** test execute cmd in remote host...
     struct rmt_exec_status_output status_output = {0};
     char *cmdline = argv[2];
     get_ssh_remote_exec(session, fd, cmdline, &status_output);
     INFO("status code is %d, and output is:", status_output.status_code);
     PRINTF_STDOUT_BUFF(status_output.vl.buff, status_output.vl.size);
-    //PRINTF_BUFF(status_output.vl.buff, status_output.vl.size, "+> ", 1);
-    /*
-    struct vl_buff *vl = format_multiline(status_output.vl.buff, status_output.vl.size, "+> ");
-    write(1, vl->buff, vl->size);
-    free_vl_buff(vl);
     */
 
-    // ** test download file from remote host...
     /*
+    // ** test download file from remote host...
     char *remote_path = argv[2];
     char *local_path = argv[3];
     scp_download_one_non_blocking(session, fd, remote_path, local_path);
     */
+
+    // ** test upload file to remote host...
+    char *local_path = argv[2];
+    char *remote_path = argv[3];
+    scp_upload_one_non_blocking(session, fd, local_path, remote_path);
 
     return 0;
 }
