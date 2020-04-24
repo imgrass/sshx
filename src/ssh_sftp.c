@@ -162,7 +162,7 @@ static void read_output_from_channel(LIBSSH2_SESSION *session,
                 for (i=0; i<rc; i++) {
                     add_word_to_ukl_buff(buff[i], result);
                 }
-                printf("<total len:%lu\n", result->total_len);
+                // DEBUG("total len:%lu\n", result->total_len);
             } else {
                 if (rc != LIBSSH2_ERROR_EAGAIN) {
                     // DEBUG("Libssh2_channel_read returned %d", rc);
@@ -198,7 +198,7 @@ int get_ssh_remote_exec(LIBSSH2_SESSION *session, int fd, char *cmdline,
         wait_socket(fd, session);
     }
     if (channel==NULL) {
-        ERROR("exec cmd:<%s> in peer host failed due to open channel failed,"
+        ERROR("Exec cmd:<%s> in peer host failed due to open channel failed, "
                 "the detailed reason is: %s", cmdline,
                 strerror(errno));
         return -1;
@@ -350,7 +350,7 @@ int scp_download_one_non_blocking(LIBSSH2_SESSION *session, int socket_fd,
 }
 
 
-int scp_upload_one(LIBSSH2_SESSION *session, int fd, char *local_path,
+int scp_upload_one_non_blocking(LIBSSH2_SESSION *session, int fd, char *local_path,
         char *remote_path) {
     return 0;
 }

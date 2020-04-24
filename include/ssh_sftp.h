@@ -34,6 +34,6 @@ int get_ssh_remote_exec(LIBSSH2_SESSION *session, int fd, char *cmdline,
         struct rmt_exec_status_output *status_output);
 int scp_download_one_non_blocking(LIBSSH2_SESSION *session, int socket_fd,
         char *remote_path, char *local_path);
-int scp_upload_one(LIBSSH2_SESSION *session, int fd, char *local_path,
+int scp_upload_one_non_blocking(LIBSSH2_SESSION *session, int fd, char *local_path,
         char *remote_path);
 #endif

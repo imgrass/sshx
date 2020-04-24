@@ -1,6 +1,7 @@
 #ifndef __HEADER_SSHX_STRING__
 #define __HEADER_SSHX_STRING__
 
+#include <stdlib.h>
 #include <string.h>
 #include <utils.h>
 /**
@@ -54,6 +55,12 @@ inline void init_ukl_buff(struct ukl_buff *ukl, size_t unit_len) {
 
 inline void free_mem_of_vl_buff(struct vl_buff *vl) {
     free(vl->buff);
+}
+
+
+inline void free_vl_buff(struct vl_buff *vl) {
+    free(vl->buff);
+    free(vl);
 }
 
 

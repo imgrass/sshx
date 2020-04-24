@@ -63,3 +63,57 @@ struct sockaddr_storage *get_host_from_name(char *hostname,
     }
     return (struct sockaddr_storage *)(first_res->ai_addr);
 }
+
+
+struct vl_buff *format_multiline(int8_t *mline, size_t len, char *prefix) {
+    size_t nline = 0;
+    int8_t *pcur=NULL, *pnew=NULL, *pbuf=NULL;
+    size_t buf_size = 0;
+    size_t prefix_size = strlen(prefix);
+    struct vl_buff *vl = NULL;
+    int8_t *buf = NULL;
+
+    // count numbers of all '\n' in mline
+    for (pcur=mline; pcur-mline<len; pcur++) {
+        if (*pcur=='\n') {
+            nline++;
+        }
+    }
+    nline++;
+
+    vl = (struct vl_buff *)calloc(1, sizeof(struct vl_buff));
+    buf_size = nline * prefix_size + len + 1;
+    buf = (int8_t *)calloc(1, buf_size);
+    vl->buff = buf;
+    vl->size = buf_size;
+
+    for (pcur=mline, pnew=mline, pbuf=buf;; pnew++) {
+        if (*pnew=='\n' || pnew-mline==len) {
+            memcpy(pbuf, prefix, prefix_size);
+            pbuf += prefix_size;
+
+            if (pnew-mline==len) {
+                memcpy(pbuf, pcur, pnew-pcur);
+                pbuf += (pnew - pcur);
+                break;
+            } else {
+                memcpy(pbuf, pcur, pnew-pcur+1);
+                pbuf += (pnew - pcur + 1);
+                pcur = pnew + 1;
+            }
+        }
+    }
+    memcpy(pbuf, "\n", 1);
+    return vl;
+}
+
+
+void _printf_buff(int8_t *buf, size_t size, char *prefix, int fd) {
+    struct vl_buff *vl = NULL;
+    vl = format_multiline(buf, size, prefix);
+    if (write(fd, vl->buff, vl->size) == -1) {
+        ERROR("Failed to write buffer to fd:%d due to %s", fd,
+                strerror(errno));
+    }
+    free_vl_buff(vl);
+}
