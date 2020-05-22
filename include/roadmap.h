@@ -10,9 +10,11 @@
     (str) = (char *)calloc(xml_string_length((xml_str))+1, sizeof(char)); \
     if (!str) { \
         ERROR("Allocate memory failed") \
+        (str) = NULL; \
+    } else { \
+        xml_string_copy((xml_str), (uint8_t *)(str), \
+                xml_string_length((xml_str))); \
     } \
-    xml_string_copy((xml_str), (uint8_t *)(str), \
-            xml_string_length((xml_str))); \
 } while(0);
 #define SAFE_FREE_STR_MEMORY(str) do {\
     free(str); \
@@ -32,6 +34,8 @@ struct roadmap_next_node {
     char *user;
     char *password;
     char *identityfile;
+
+    struct sockaddr_storage ipaddr;
 };
 
 struct local_node_info {
@@ -49,7 +53,7 @@ struct node {
 };
 
 
-int parse_roadmap(FILE *source, struct node **node, int layer);
+int parse_roadmap(FILE *source, struct node *node, int layer);
 void print_roadmap_node_info(struct node *node);
 void free_mem_in_node(struct node *node);
 #endif

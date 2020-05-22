@@ -79,13 +79,13 @@ LIBSSH2_SESSION *create_ssh_authed_session(int *fd,
         struct roadmap_next_node *nxt_nd) {
     int rc = 0;
     const char *fingerprint = NULL;
-    struct sockaddr_storage *ipaddr = get_host_from_name(nxt_nd->hostname, 22);
-    *fd = get_socket_fd(ipaddr);
     LIBSSH2_SESSION *session = libssh2_session_init();
     if (!session) {
         ERROR("Could not initialize SSH session!");
         return NULL;
     }
+
+    *fd = get_socket_fd(&nxt_nd->ipaddr);
 
     INFO("ssh %s@%s -p %s", nxt_nd->user, nxt_nd->hostname, "22")
     // TCP handshake

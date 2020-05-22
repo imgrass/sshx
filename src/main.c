@@ -1,15 +1,8 @@
 #include <roadmap.h>
 #include <ssh_sftp.h>
+#include <ssh_tunnel.h>
 #include <stdlib.h>
 #include <utils.h>
-
-
-static void on_exit_free_node(int status, void *node) {
-    if (node != NULL) {
-        INFO("++ Free callocated memory in <node:%p>", node);
-        free_mem_in_node((struct node *)node);
-    }
-}
 
 
 static void on_exit_close_ssh_session(int status, void *session) {
@@ -35,14 +28,13 @@ static void on_exit_close_socket(int status, void *socket_fd) {
 int main(int argc, char **argv) {
     int fd = 0;
     LIBSSH2_SESSION *session = NULL;
-    struct node *node = NULL;
+    struct node nd = {0};
     char *xml_file = argv[1];
     FILE *fp_xml = fopen(xml_file, "rb");
 
     // register on_exit functions
     on_exit(on_exit_close_socket, &fd);
     on_exit(on_exit_close_ssh_session, session);
-    on_exit(on_exit_free_node, node);
 
     if (!fp_xml) {
         ERROR("Open xml file named %s failed", xml_file);
@@ -50,13 +42,16 @@ int main(int argc, char **argv) {
     }
 
     INFO("It would parse xml named %s", xml_file);
-    parse_roadmap(fp_xml, &node, 0);
-    print_roadmap_node_info(node);
+    if (parse_roadmap(fp_xml, &nd, 0) != 0) {
+        ERROR("Parse roadmap failed!");
+        exit(1);
+    }
+    print_roadmap_node_info(&nd);
 
-    session = create_ssh_authed_session(&fd, &node->peer_load_info);
+    session = create_ssh_authed_session(&fd, &nd.peer_load_info);
     if (session==NULL) {
         ERROR("Create SSH session failed, exit...");
-        return 1;
+        exit(1);
     }
 
     /*
@@ -75,10 +70,35 @@ int main(int argc, char **argv) {
     scp_download_one_non_blocking(session, fd, remote_path, local_path);
     */
 
+    /*
     // ** test upload file to remote host...
     char *local_path = argv[2];
     char *remote_path = argv[3];
     scp_upload_one_non_blocking(session, fd, local_path, remote_path);
+    */
+
+    /*
+    // local listen address
+    struct sockaddr_storage lcl;
+    // ssh server address
+    struct sockaddr_storage srv;
+    // remote forwarding address
+    struct sockaddr_storage rmt;
+    */
+
+    // ** test ip forward
+    int rc = 0;
+    struct ssh_tunnel_ip_list stil = {0};
+    memcpy(&stil.srv, &nd.peer_load_info.ipaddr,
+            sizeof(struct sockaddr_storage));
+
+    rc |= str2ip(&stil.lcl, "127.0.0.1", 25535);
+    rc |= str2ip(&stil.rmt, "127.0.0.1", 25535);
+    if (rc != 0) {
+        ERROR("Init ssh_tunnel_ip_list failed");
+        exit(1);
+    }
+    create_ssh_tcpip_tunnel(session, &stil);
 
     return 0;
 }

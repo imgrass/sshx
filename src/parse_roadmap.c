@@ -23,34 +23,70 @@ static int string_equals(struct xml_string* xml_str, char const* str) {
 }
 
 
-static int fill_node_from_source(struct node **node, struct xml_node *xml_node,
-        int layer) {
-    *node = (struct node*)calloc(1, sizeof(struct node));
-    if (!*node) {
-        ERROR("Allocate memory for struct node failed");
-        exit(1);
-    }
+static int check_roadmap_node_is_filled_vaild(struct node *nd) {
+    /**roadmap_next_node
+     * node->
+     *    @hostname     mandatory
+     *    @user         mandatory
+     *    @password     optional
+     *    @identityfile optional
+     *
+     * Note: at least one of the <password> and <identityfile> exists.
+     */
+    int rc = 0;
+    struct roadmap_next_node *ptr = &nd->peer_load_info;
 
-    (*node)->layer = layer;
-    SAFE_COPY_FROM_XML_TO_STR((*node)->peer_load_info.hostname,
+    rc |= (ptr->hostname == NULL ? 1 : 0);
+    rc |= (ptr->user == NULL ? 1 : 0);
+    rc |= (ptr->password == NULL && ptr->identityfile == NULL ? 1 : 0);
+
+    return rc;
+}
+
+
+static int fill_node_from_source(struct node *nd, struct xml_node *xml_node,
+        int layer) {
+    int rc = 0;
+    nd->layer = layer;
+
+    // fill peer_load_info string
+    SAFE_COPY_FROM_XML_TO_STR(nd->peer_load_info.hostname,
             xml_node_content(xml_easy_child(xml_node,
                     (uint8_t *)"Hostname", 0)))
-    SAFE_COPY_FROM_XML_TO_STR((*node)->peer_load_info.user,
+    SAFE_COPY_FROM_XML_TO_STR(nd->peer_load_info.user,
             xml_node_content(xml_easy_child(xml_node,
                     (uint8_t *)"User", 0)))
-    SAFE_COPY_FROM_XML_TO_STR((*node)->peer_load_info.password,
+    SAFE_COPY_FROM_XML_TO_STR(nd->peer_load_info.password,
             xml_node_content(xml_easy_child(xml_node,
                     (uint8_t *)"Password", 0)))
-    SAFE_COPY_FROM_XML_TO_STR((*node)->peer_load_info.identityfile,
+    SAFE_COPY_FROM_XML_TO_STR(nd->peer_load_info.identityfile,
             xml_node_content(xml_easy_child(xml_node,
                     (uint8_t *)"IdentityFile", 0)))
+    if (check_roadmap_node_is_filled_vaild(nd)!=0) {
+        ERROR("The roadmap peer node info is invalid, pls check it");
+        return 1;
+    }
+    // fill peer ip address
+    rc = 0;
+    rc |= get_host_from_name(&nd->peer_load_info.ipaddr,
+            nd->peer_load_info.hostname);
+    rc |= embed_port(&nd->peer_load_info.ipaddr, 22);
+    if (rc!=0) {
+        ERROR("Parse ip address from roadmap peer node info failed");
+        return 1;
+    }
 
-    gethostname((*node)->local_info.hostname, 64);
+    // fill local info string
+    if (gethostname(nd->local_info.hostname, 64) != 0) {
+        ERROR("Get local hostname failed due to %s", strerror(errno));
+        return 1;
+    }
+
     return 0;
 }
 
 
-int parse_roadmap(FILE *source, struct node **node, int layer) {
+int parse_roadmap(FILE *source, struct node *nd, int layer) {
     int idx_node = 0;
     int idx_attr = 0;
     int flg_lcl_nd_is_found = 0;
@@ -61,7 +97,7 @@ int parse_roadmap(FILE *source, struct node **node, int layer) {
     struct xml_document *document = xml_open_document(source);
     if (!document) {
         ERROR("Could not parse document\n");
-        exit(1);
+        return 1;
     }
 
     nd_rt = xml_document_root(document);
@@ -91,10 +127,14 @@ int parse_roadmap(FILE *source, struct node **node, int layer) {
 
     if (!flg_lcl_nd_is_found) {
         ERROR("Can not found node with <layer:%d> in roadmap", layer);
-        exit(1);
+        return 1;
     }
 
-    fill_node_from_source(node, nd_lcl, layer);
+    if (fill_node_from_source(nd, nd_lcl, layer) != 0) {
+        ERROR("Fill node from source failed with <layer:%d>", layer);
+        return 1;
+    }
+
     xml_document_free(document, true);
     return 0;
 }

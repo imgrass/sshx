@@ -6,6 +6,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <sshx_string.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -73,12 +74,21 @@
 } while(0);
 
 
-void printf_ipaddr(struct sockaddr_storage *ipaddr);
+struct ipstr {
+    int version;
+    char addr[INET6_ADDRSTRLEN];
+    uint16_t port;
+};
 
-struct sockaddr_storage *get_host_from_name(char *hostname,
-        unsigned short port);
+
+int get_host_from_name(struct sockaddr_storage *ipaddr, char *hostname);
 
 struct vl_buff *format_multiline(int8_t *mline, size_t len, char *prefix);
 
 void _printf_buff(int8_t *buf, size_t size, char *prefix, int fd);
+
+int str2ip(struct sockaddr_storage *ip, char *ip_str, uint16_t port);
+int embed_port(struct sockaddr_storage *ip, uint16_t port);
+
+int ip2str(struct ipstr *ip_str, struct sockaddr_storage *ip_sock);
 #endif

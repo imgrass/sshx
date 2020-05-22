@@ -1,67 +1,40 @@
 #include <utils.h>
 
 
-void printf_ipaddr(struct sockaddr_storage *ipaddr) {
-    char addrstr[64] = {0};
-    void *ptr = NULL;
-    switch (ipaddr->ss_family) {
-        case AF_INET:
-            ptr = &((struct sockaddr_in *)ipaddr)->sin_addr;
-            break;
-        case AF_INET6:
-            ptr = &((struct sockaddr_in6 *)ipaddr)->sin6_addr;
-            break;
-    }
-    inet_ntop(ipaddr->ss_family, ptr, addrstr, 64);
-    INFO("IPv%d address: %s", ipaddr->ss_family == PF_INET6 ? 6 : 4,
-            addrstr);
-    return;
-}
-
-
-struct sockaddr_storage *get_host_from_name(char *hostname,
-        unsigned short port) {
+int get_host_from_name(struct sockaddr_storage *ipaddr, char *hostname) {
     struct addrinfo hints = {0}, *res = NULL, *first_res = NULL;
-    int errcode = 0;
+    int rc = 0;
 
     hints.ai_family = PF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags |= AI_CANONNAME;
 
-    errcode = getaddrinfo(hostname, NULL, &hints, &res);
-    if (errcode != 0) {
+    rc = getaddrinfo(hostname, NULL, &hints, &res);
+    if (rc != 0) {
         ERROR("Can not get addr from <hostname:%s>", hostname);
-        return NULL;
+        freeaddrinfo(res);
+        return 1;
     }
     first_res = res;
 
 #ifdef IMGRASS_DEBUG
-    char addrstr[64] = {0};
-    void *ptr = NULL;
+    struct ipstr ip_str = {0};
     DEBUG("==> Get addr from <hostname:%s>", hostname);
     while (res) {
-        switch (res->ai_family) {
-            case AF_INET:
-                ptr = &((struct sockaddr_in *)res->ai_addr)->sin_addr;
-                break;
-            case AF_INET6:
-                ptr = &((struct sockaddr_in6 *)res->ai_addr)->sin6_addr;
-                break;
+        rc = ip2str(&ip_str, (struct sockaddr_storage *)(res->ai_addr));
+        if (rc==1) {
+            PRINTF_RAW_STRING(stdout, "*!  invalid ip address\n");
+            continue;
         }
-        inet_ntop(res->ai_family, ptr, addrstr, 64);
-        DEBUG("IPv%d address: %s", res->ai_family == PF_INET6 ? 6 : 4,
-                addrstr);
+        PRINTF_RAW_STRING(stdout, "*o  IPv%d %s\n", ip_str.version, ip_str.addr);
         res = res->ai_next;
     }
 #else
 #endif
-    // Add port here.
-    if (first_res->ai_family == AF_INET) {
-        ((struct sockaddr_in *)(first_res->ai_addr))->sin_port = htons(port);
-    } else if (first_res->ai_family == AF_INET6) {
-        ((struct sockaddr_in6 *)(first_res->ai_addr))->sin6_port = htons(port);
-    }
-    return (struct sockaddr_storage *)(first_res->ai_addr);
+    memcpy(ipaddr, (struct sockaddr_storage *)(first_res->ai_addr),
+            sizeof(struct sockaddr_storage));
+    freeaddrinfo(first_res);
+    return 0;
 }
 
 
@@ -116,4 +89,61 @@ void _printf_buff(int8_t *buf, size_t size, char *prefix, int fd) {
                 strerror(errno));
     }
     free_vl_buff(vl);
+}
+
+
+int str2ip(struct sockaddr_storage *ip, char *ipstr, uint16_t port) {
+    int rc = 0;
+
+    // check if ipstr is ipv4
+    rc = inet_pton(AF_INET, ipstr, &((struct sockaddr_in *)ip)->sin_addr);
+    if (rc==1) {
+        ip->ss_family = AF_INET;
+        ((struct sockaddr_in *)ip)->sin_port = htons(port);
+        DEBUG("ipstr:<%s> is ipv4 address\n", ipstr);
+        return 0;
+    }
+
+    // check if ipstr is ipv6
+    rc = inet_pton(AF_INET6, ipstr, &((struct sockaddr_in6 *)ip)->sin6_addr);
+    if (rc==1) {
+        ip->ss_family = AF_INET6;
+        ((struct sockaddr_in6 *)ip)->sin6_port = htons(port);
+        DEBUG("ipstr:<%s> is ipv6 address\n", ipstr);
+        return 0;
+    }
+
+    DEBUG("ipstr:<%s> is invalid ip address\n", ipstr);
+    return 1;
+}
+
+
+int embed_port(struct sockaddr_storage *ip, uint16_t port) {
+    if (ip->ss_family==AF_INET) {
+        ((struct sockaddr_in *)ip)->sin_port = htons(port);
+        return 0;
+    } else if (ip->ss_family==AF_INET6) {
+        ((struct sockaddr_in6 *)ip)->sin6_port = htons(port);
+        return 0;
+    } else {
+        return 1;
+    }
+}
+
+
+int ip2str(struct ipstr *ip_str, struct sockaddr_storage *ip_sock) {
+    if (ip_sock->ss_family == AF_INET) {
+        ip_str->version = 4;
+        inet_ntop(AF_INET, &((struct sockaddr_in *)ip_sock)->sin_addr,
+                ip_str->addr, INET6_ADDRSTRLEN);
+        ip_str->port = ntohs(((struct sockaddr_in *)ip_sock)->sin_port);
+        return 0;
+    } else if (ip_sock->ss_family == AF_INET6) {
+        ip_str->version = 6;
+        inet_ntop(AF_INET6, &((struct sockaddr_in6 *)ip_sock)->sin6_addr,
+                ip_str->addr, INET6_ADDRSTRLEN);
+        ip_str->port = ntohs(((struct sockaddr_in6 *)ip_sock)->sin6_port);
+        return 0;
+    }
+    return 1;
 }
